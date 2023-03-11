@@ -43,8 +43,8 @@ GFXcanvas16 canvas(240, 135);
 
 #include "WiFi.h"
 // Enter your WiFi SSID and password
-char ssid[] = "nyxnet-iot";  // your network SSID (name)
-char pass[] = "480010273b";  // your network password (WPA,WPA2, not WEP)
+char ssid[] = "YourSSID";  // your network SSID (name)
+char pass[] = "YourWiFiPassword";  // your network password (WPA,WPA2, not WEP)
 int status = WL_IDLE_STATUS;
 // Initialize the wifi client library
 WiFiClient client;
