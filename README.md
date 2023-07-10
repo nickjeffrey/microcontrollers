@@ -40,15 +40,10 @@ RSSI signal strength: -58 dBm
 WiFi channel: 6
 -------------------------------
 Nearby WiFi Networks:
-1: YYC Net Lab (RSSI -44 dBm, Channel 6)
-2: nyxnet (RSSI -48 dBm, Channel 1)
-3: nyxnet-iot (RSSI -50 dBm, Channel 11)
-4: nyxnet (RSSI -56 dBm, Channel 6)
-5: nyxnet-iot (RSSI -58 dBm, Channel 6)
-6: BCFamily-2.4G (RSSI -65 dBm, Channel 11)
-7: WiFiPlus4357-2.4G (RSSI -66 dBm, Channel 1)
-8: nyxnet-DSL2 (RSSI -72 dBm, Channel 1)
-9: TELUS0401 (RSSI -83 dBm, Channel 1)
+1: BigCorp (RSSI -44 dBm, Channel 6)
+2: HotelGuest (RSSI -48 dBm, Channel 1)
+3: StarBucks Wifi (RSSI -50 dBm, Channel 11)
+4: Free Airport Wifi (RSSI -56 dBm, Channel 6)
 ----------------------------------------
 Hardware inventory:
 Microcontroller: Adafruit ESP32-S2 TFT
@@ -58,3 +53,7 @@ Software build environment: Arduino IDE 2.1.1
 Software build date: 2023-07-09
 Software build source: https://github.com/nickjeffrey/microcontrollers
 ```
+
+# TFT Display Output
+- TFT display is more space constrained (4 lines, 20 characters per line)
+- TFT display shows a subset of the web page (sensor readings, wifi network, MAC address, IP address, uptime)
