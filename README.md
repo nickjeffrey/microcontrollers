@@ -14,10 +14,10 @@ Distance: 1589 mm
 -------------------------
 WiFi Details:
 MAC address: 7C:DF:A1:96:70:D0
-IP address: 10.10.30.41
+IP address: 10.99.99.99
 Subnet mask: 255.255.255.0
-Gateway: 10.10.30.1
-SSID: nyxnet-iot
+Gateway: 10.99.99.1
+SSID: myWifiNetwork
 RSSI signal strength: -58 dBm
 WiFi channel: 6
 -------------------------------
