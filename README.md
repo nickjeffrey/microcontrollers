@@ -1,7 +1,25 @@
-# microcontrollers
-firmware for assorted microcontrollers
-
 # Overview
+- This is an ESP32 microcontroller with assorted sensors, with readings displayed on the TFT display, as well as on a web page
+
+# Supported Microcontrollers
+- Adafruit ESP32-S2 TFT
+- Adafruit ESP32-S3 TFT
+
+# Supported Sensors
+- Adafruit AHT20 temperature and humidity sensor
+- Adafruit BME280 temperature and humidity
+- Adafruit BME680 temperature, humidity, altitude, barometric pressure, gas resistance
+- Adafruit VL53L0X time of flight distance sensor
+- Adafruit VL53L1X time of flight distance sensor
+- Adafruit VL6180X time of flight and lux sensor
+  
+
+# Supported Actuators
+- none so far
+  
+# Supported Build Environment
+- Arduino IDE 2.x
+
 
 # Web Page Output
 ```
