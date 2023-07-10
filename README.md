@@ -7,9 +7,7 @@
 
 # Supported Sensors
 - Adafruit AHT20 temperature and humidity sensor
-- Adafruit BME280 temperature and humidity
 - Adafruit BME680 temperature, humidity, altitude, barometric pressure, gas resistance
-- Adafruit VL53L0X time of flight distance sensor
 - Adafruit VL53L1X time of flight distance sensor
 - Adafruit VL6180X time of flight and lux sensor
   
