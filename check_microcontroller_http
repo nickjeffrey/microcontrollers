@@ -1,0 +1,250 @@
+#!/usr/bin/perl -w
+
+#
+#  Nagios plugin for scraping HTTP interface of ESP32 etermining disk IO load.
+#
+
+# OUTSTANDING TASKS
+# -----------------
+
+
+# CHANGE LOG
+# ----------
+#   2023-01-15  njeffrey	Script created 
+#   2024-01-12  njeffrey	Regex fix, was not matching negative numbers in temperature readings 
+
+
+
+
+# NOTES
+# -----
+#  This script should return one (and only one) line of ouput.  Multiple
+#  lines of output are silently ignored by nagios.
+#
+#  The line of output will become the body of the alert message sent by nagios
+#
+#
+#
+#  You will need a section similar to the following in services.cfg on the nagios server:
+#      define service {
+#              use                             generic-24x7-service
+#              hostgroup_name                  all_microcontrollers
+#              service_description             ESP32 sensors
+#              check_command                   check_microcontroller_http
+#              }
+#
+#  You will need a section similar to the following in commands.cfg on the nagios server:
+#     # 'check_microcontroller_http' command definition
+#     # parameters are -H hostname
+#     define command{
+#             command_name    check_microcontroller_http
+#             command_line    $USER1$/check_microcontroller_http -H $HOSTADDRESS$
+#             }
+
+
+
+use diagnostics;                                #tell the perl interpreter to give us verbose messages while debugging
+use strict;                                     #enforce good coding practices
+use Getopt::Long;                               #allow --long-switches to be used as parameters
+use POSIX;                                      #use perl core module to emulate uname command to determine operating system
+
+
+
+my ($curl,$cmd,$host,%sensors);
+my ($opt_h,$opt_v,$opt_H,$opt_t,$opt_T,$opt_d,$opt_D);
+my ($perf_data,$common_output_data);
+my ($temperature_warn_hot,$temperature_warn_cold,$distance_warn_min,$distance_warn_max);
+# define variables
+$curl                = "/usr/bin/curl";                            	#location of binary
+my $verbose             = "no";						#yes/no flag for verbose output for debugging
+my ($OK,$WARN,$CRITICAL,$UNKNOWN,$CHECK_NAME);				#define variables
+
+$CHECK_NAME             = "ESP32 sensors";				#define name of nagios check
+$temperature_warn_hot   = 25;						#initialize variable
+$temperature_warn_cold  = 10;						#initialize variable
+$distance_warn_min      = 0;						#initialize variable
+$distance_warn_max      = 9999;						#initialize variable
+
+
+#
+# Nagios return codes
+#
+$OK=            0;                              			#this script returns a value to nagios for processing
+$WARN=          1;                              			#this script returns a value to nagios for processing
+$CRITICAL=      2;                              			#this script returns a value to nagios for processing
+$UNKNOWN=       3;                              			#this script returns a value to nagios for processing
+
+
+sub get_options {
+   #
+   # this gets the command line parameters provided by the users
+   print "running get_options subroutine \n" if ($verbose eq "yes");
+   #
+   Getopt::Long::Configure('bundling');
+   GetOptions(
+      "h"   => \$opt_h, "help"                    => \$opt_h,
+      "v"   => \$opt_v, "verbose"                 => \$opt_v,
+      "H=s" => \$opt_H, "host=s"                  => \$opt_H,
+      "t=i" => \$opt_t, "temperature_warn_cold=i" => \$opt_t,
+      "T=i" => \$opt_T, "temperature_warn_hot=i"  => \$opt_T,
+      "d=i" => \$opt_d, "distance_warn_min=i"     => \$opt_d,
+      "D=i" => \$opt_D, "distance_warn_max=i"     => \$opt_D,
+   );
+   #
+   #
+   # see if user provided -v or --verbose switch
+   if ( defined($opt_v) ) {
+      $verbose = "yes";
+      print "   setting verbose=yes \n";
+   }                                                    #end of if block
+   #
+   #
+   # see if user provided -h or --help switch
+   if ( defined($opt_h) ) {
+      print "   Usage: $0 --host=SomeHostName \n";
+      print "   Usage: $0 --temperature_warn=##  (optional warning threshold for ambient temperature Celsius \n";
+      print "   Usage: $0 --distance_warn=##     (optional warning threshold for time of flight distance reading in millimeters \n";
+      print "   Usage: $0 --verbose \n";
+      print "   Usage: $0 --help \n";
+      exit;
+   }                                                    #end of if block
+   #
+   #
+   # see if user provided --host=somehost switch
+   unless ( defined($opt_H) ) {
+      print "   Usage: $0 --host=SomeHostName \n";
+      print "   Usage: $0 --verbose \n";
+      print "   Usage: $0 --help \n";
+      exit;
+   }                                                    #end of if block
+   if ( defined($opt_H) ) {
+      $host = $opt_H;
+   }                                                    #end of if block
+   #
+   # see if user provided --temperature_warn_cold=##
+   if ( defined($opt_t) ) {
+      $temperature_warn_cold = $opt_t;
+      print "   temperature_warn_cold=$temperature_warn_cold \n" if ($verbose eq "yes");
+   }                                                    #end of if block
+   #
+   # see if user provided --temperature_warn_hot=##
+   if ( defined($opt_T) ) {
+      $temperature_warn_hot = $opt_T;
+      print "   temperature_warn_hot=$temperature_warn_hot \n" if ($verbose eq "yes");
+   }                                                    #end of if block
+   #
+   # see if user provided --distance_warn_min=##
+   if ( defined($opt_d) ) {
+      $distance_warn_min = $opt_d;
+      print "   distrance_warn_min=$distance_warn_min \n" if ($verbose eq "yes");
+   }                                                    #end of if block
+   #
+   # see if user provided --distance_warn_max=##
+   if ( defined($opt_D) ) {
+      $distance_warn_max = $opt_D;
+      print "   distrance_warn_max=$distance_warn_max \n" if ($verbose eq "yes");
+   }                                                    #end of if block
+}                       #end of subroutine
+
+
+
+
+
+
+sub sanity_checks {
+   #
+   print "running sanity_checks subroutine \n" if ($verbose eq "yes");
+   #
+   # confirm the required files exist and are executable
+   #
+   #
+   $_ = $curl;
+   if ( ! -e "$_" ) {  print "$CHECK_NAME UNKNOWN required file $_ not found \n"                            ; exit $UNKNOWN; }
+   if ( ! -x "$_" ) {  print "$CHECK_NAME UNKNOWN required file $_ is not executable by the nagios user \n" ; exit $UNKNOWN; }
+}   
+
+
+
+
+sub check_sensor_readings {
+   #
+   print "running check_sensor_readings subroutine \n" if ($verbose eq "yes");
+   #
+   $sensors{temperature}         = 0;                                    			#initialize hash element to avoid undef errors
+   $sensors{humidity}            = 0;                                    			#initialize hash element to avoid undef errors
+   $sensors{battery_volts}       = 0;                                    			#initialize hash element to avoid undef errors
+   $sensors{battery_pct}         = 0;                                    			#initialize hash element to avoid undef errors
+   $sensors{garagedoor_distance} = 0;                                    			#initialize hash element to avoid undef errors
+   $sensors{garagedoor_state}    = "unknown";                                  			#initialize hash element to avoid undef errors
+   $cmd = "$curl http://$host";
+   print "   running command: $cmd \n" if ($verbose eq "yes");
+   open(IN,"$cmd 2>&1 |");                                                                   	#optn filehandle from command output
+   while (<IN>) {                                                                            	#read a line from the command output
+      $sensors{temperature}         = $1   if ( /Temperature: ([0-9\.\-]+) C/);               	#parse out line from web page
+      $sensors{humidity}            = $1   if ( /Humidity: ([0-9\.]+) /);                	#parse out line from web page
+      $sensors{battery_volts}       = $1   if ( /Battery: ([0-9\.]+) V \/ ([0-9]+)\%/);     	#parse out line from web page
+      $sensors{battery_pct}         = $2   if ( /Battery: ([0-9\.]+) V \/ ([0-9]+)\%/);     	#parse out line from web page
+      $sensors{garagedoor_distance} = $1   if ( /Distance: ([0-9\-]+)/ );                   	#parse out line from web page
+   }                                                                                         	#end of while loop
+   close IN;                                                                                 	#close filehandle
+   $sensors{garagedoor_state} = "closed" if ( ($sensors{garagedoor_distance} < 0)  || ($sensors{garagedoor_distance} >= 200) ); 
+   $sensors{garagedoor_state} = "open"   if ( ($sensors{garagedoor_distance} > 20) && ($sensors{garagedoor_distance} <  200) ); 
+   print "   Garage Temperature:$sensors{temperature}C Humidity:$sensors{humidity}\% Battery_volts:$sensors{battery_volts}V Battery_pct:$sensors{battery_pct}\% Door:$sensors{garagedoor_distance}mm DoorState:$sensors{garagedoor_state} \n" if ($verbose eq "yes");
+}                                                               #end of subroutine
+
+
+
+
+
+
+
+sub print_output {
+   #
+   print "running print_output subroutine \n" if ($verbose eq "yes");
+   #
+   #
+   #
+   # The nagios performance data will be the same for all the outputs, so just put it in a variable that can be use by all the output options
+   # The format is:  label=value[UOM];[warn];[crit];[min];[max]
+   # On the "label=value" section is required.  The warn|crit|min|max entries are optional.
+   # You can have multiple items of perf data, just separate each section with a space
+   # UOM is Units Of Measurement.    Can be s=seconds B=bytes MB=megabytes %=percent c=counter
+   $perf_data = "temperature=$sensors{temperature};;;; humidity=$sensors{humidity};;;; distance=$sensors{garagedoor_distance};;;; ";
+   #
+   $common_output_data = "GarageDoorState:$sensors{garagedoor_state} temperature=$sensors{temperature}C humidity=$sensors{humidity}\% distance=$sensors{garagedoor_distance}mm ";
+   #
+   if ( $sensors{temperature} < $temperature_warn_cold ) {
+      print "$CHECK_NAME WARN - ambient temperature too cold, $common_output_data | $perf_data  \n";			
+      exit $WARN;
+   }
+   if ( $sensors{temperature} > $temperature_warn_hot ) {
+      print "$CHECK_NAME WARN - ambient temperature too hot, $common_output_data | $perf_data  \n";			
+      exit $WARN;
+   }
+   if ( $sensors{garagedoor_state} eq "open" ) {
+      print "$CHECK_NAME WARN - garage door is open, please investigate. $common_output_data | $perf_data  \n";			
+      exit $WARN;
+   }
+   #
+   # We should only get here if there were no problems detected
+   #
+   print "$CHECK_NAME OK - $common_output_data | $perf_data  \n";			
+   exit $OK;
+}                                                       #end of subroutine
+
+
+
+
+
+
+
+
+
+
+
+
+# --------------- main body of program ------------------------------------
+get_options;
+sanity_checks;
+check_sensor_readings;
+print_output;
