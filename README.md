@@ -56,4 +56,5 @@ Software build source: https://github.com/nickjeffrey/microcontrollers
 - TFT display is more space constrained (4 lines, 20 characters per line)
 - TFT display shows a subset of the web page (sensor readings, wifi network, MAC address, IP address, uptime)
 - Due to space constraints, TFT display cycles through multiple pages of text, pausing a few seconds on each page
+  
 <img src=images/esp32-s2-tft.png> <img src=images/esp32-s2-tft.2.png>
